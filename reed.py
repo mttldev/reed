@@ -51,7 +51,7 @@ def execute(command: str):
             return [exec(command), ExecuteEnvironment.PYTHON, ExecuteMode.EXEC]
 
 async def callback_websocket(websocket: WebSocketServerProtocol):
-    notify(f"reed: New connection from {websocket.remote_address[0]}")
+    notify(f"[reed] New connection from {websocket.remote_address[0]}")
     try:
         async for message in websocket:
             print(f"<<< {message}")
@@ -66,14 +66,14 @@ async def callback_websocket(websocket: WebSocketServerProtocol):
                 print(f"Error: {e}")
                 await websocket.send(f"ERR>>> {e}")
     except ConnectionClosedError:
-        notify(f"reed: Connection from {websocket.remote_address[0]} closed ({websocket.close_code})")
+        notify(f"[reed] Connection from {websocket.remote_address[0]} closed ({websocket.close_code})")
 
-async def serve_websocket():
-    async with serve(callback_websocket, "0.0.0.0", 35124):
+async def serve_websocket(port: int = 35124):
+    async with serve(callback_websocket, "0.0.0.0", port):
         await asyncio.Future()
 
-def run():
+def run(port: int):
     if renpy:
-        renpy.invoke_in_thread(asyncio.run, serve_websocket())
+        renpy.invoke_in_thread(asyncio.run, serve_websocket(port=port))
     else:
-        asyncio.run(serve_websocket())
+        asyncio.run(serve_websocket(port=port))
