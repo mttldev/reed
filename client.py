@@ -13,7 +13,7 @@ async def ws_client():
                 send_data = input(">>> ")
                 await websocket.send(send_data)
                 recv_data = await websocket.recv()
-                print(f"<<< {recv_data}")
+                print(f"{recv_data}")
             except ConnectionClosedError:
                 print("Connection closed.")
                 return
