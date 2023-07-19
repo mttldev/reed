@@ -1,7 +1,7 @@
 # Python 3.9.10 embedded in Ren'Py
 
 try:
-    renpy = __import__("renpy")
+    renpy = __import__("renpy").exports
 except ImportError:
     renpy = None
 
