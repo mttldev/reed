@@ -9,6 +9,7 @@ import asyncio
 import enum
 
 from typing import Final
+from websockets.exceptions import ConnectionClosedError
 from websockets.server import serve, WebSocketServerProtocol
 
 
@@ -25,6 +26,11 @@ class ExecuteMode(enum.Enum):
     EVAL = 1
     EXEC = 2
 
+def notify(message: str):
+    if renpy:
+        renpy.notify(message)
+    else:
+        print(message)
 
 def execute(command: str):
     if renpy:
@@ -45,18 +51,22 @@ def execute(command: str):
             return [exec(command), ExecuteEnvironment.PYTHON, ExecuteMode.EXEC]
 
 async def callback_websocket(websocket: WebSocketServerProtocol):
-    async for message in websocket:
-        print(f"<<< {message}")
-        # execute
-        try:
-            result = execute(str(message))
-            if result[ExecMode] == ExecuteMode.EVAL:
-                await websocket.send(f"OK[{'RENPY' if result[ExecEnv] == ExecuteEnvironment.RENPY else 'PYTHON'}]>>> {result[ExecResult]}")
-            elif result[ExecMode] == ExecuteMode.EXEC:
-                await websocket.send(f"OK[{'RENPY' if result[ExecEnv] == ExecuteEnvironment.RENPY else 'PYTHON'}].")
-        except Exception as e:
-            print(f"Error: {e}")
-            await websocket.send(f"ERR>>> {e}")
+    notify(f"reed: New connection from {websocket.remote_address[0]}")
+    try:
+        async for message in websocket:
+            print(f"<<< {message}")
+            # execute
+            try:
+                result = execute(str(message))
+                if result[ExecMode] == ExecuteMode.EVAL:
+                    await websocket.send(f"OK[{'RENPY' if result[ExecEnv] == ExecuteEnvironment.RENPY else 'PYTHON'}]>>> {result[ExecResult]}")
+                elif result[ExecMode] == ExecuteMode.EXEC:
+                    await websocket.send(f"OK[{'RENPY' if result[ExecEnv] == ExecuteEnvironment.RENPY else 'PYTHON'}].")
+            except Exception as e:
+                print(f"Error: {e}")
+                await websocket.send(f"ERR>>> {e}")
+    except ConnectionClosedError:
+        notify(f"reed: Connection from {websocket.remote_address[0]} closed ({websocket.close_code})")
 
 async def serve_websocket():
     async with serve(callback_websocket, "0.0.0.0", 35124):
