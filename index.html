@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja_JP">
+
+<head>
+    <title>reed</title>
+    <meta charset="utf-8">
+</head>
+
+<body>
+    <h1>WebSocket Client</h1>
+    <label for="address">Address: </label>
+    <input type="text" id="address" value="ws://localhost:35124">
+    <button onclick="connectOrDisconnect()">接続/切断</button>
+    <br>
+    <textarea id="log" rows="10" cols="50" readonly></textarea>
+    <br>
+    <label for="message">送信するデータ:</label>
+    <input type="text" id="message">
+    <button onclick="sendMessage()">送信</button>
+
+    <script>
+        let websocket = null;
+        const logTextarea = document.getElementById("log");
+
+        function appendLog(message) {
+            logTextarea.value += message + "\n";
+            logTextarea.scrollTop = logTextarea.scrollHeight;
+        }
+
+        function connectOrDisconnect() {
+            if (websocket === null) {
+                const address = document.getElementById("address").value;
+                websocket = new WebSocket(address);
+
+                websocket.onopen = () => {
+                    appendLog("Conncetion opened!");
+                };
+
+                websocket.onclose = () => {
+                    appendLog("Connection closed.");
+                    websocket = null;
+                };
+
+                websocket.onmessage = (event) => {
+                    appendLog(event.data);
+                };
+
+                websocket.onerror = (error) => {
+                    appendLog("WSErr: " + error.message);
+                };
+            } else {
+                websocket.close();
+            }
+        }
+
+        function sendMessage() {
+            if (websocket !== null && websocket.readyState === WebSocket.OPEN) {
+                const message = document.getElementById("message").value;
+                websocket.send(message);
+                appendLog(">>> " + message);
+            } else {
+                appendLog("WebSocket is not connected.");
+            }
+        }
+    </script>
+</body>
+
+</html>
