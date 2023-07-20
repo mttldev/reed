@@ -68,11 +68,12 @@ async def callback_websocket(websocket: WebSocketServerProtocol):
     except ConnectionClosedError:
         notify(f"[reed] Connection from {websocket.remote_address[0]} closed ({websocket.close_code})")
 
-async def serve_websocket(port: int = 35124):
+async def serve_websocket(port: int):
     async with serve(callback_websocket, "0.0.0.0", port):
         await asyncio.Future()
 
-def run(port: int):
+def run(port: int = 35124):
+    notify(f"[reed] Start WebSocket Server :{port}")
     if renpy:
         renpy.invoke_in_thread(asyncio.run, serve_websocket(port=port))
     else:
