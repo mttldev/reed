@@ -26,7 +26,7 @@ def execute(command: str) -> ExecutedResult:
     tree = ast.parse(command)
     if renpy:
         try:
-            renpy.invoke_in_main_thread(renpy.python.py_exec, compile(tree, filename="<string>", mode="exec"), globals(), locals())
+            renpy.invoke_in_main_thread(exec, compile(tree, filename="<string>", mode="exec"), globals(), locals())
             return {
                 "result": True,
                 "exception": None
@@ -75,6 +75,10 @@ async def serve_websocket(port: int = 35124):
 
 def run(port: int):
     if renpy:
+        try:
+            notify("[reed] Reed debugger is running.")
+        except Exception:
+            pass
         renpy.invoke_in_thread(asyncio.run, serve_websocket(port=port))
     else:
         asyncio.run(serve_websocket(port=port))
