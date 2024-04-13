@@ -78,6 +78,6 @@ async def serve_websocket(port: int = 35124):
 
 def run(port: int):
     if renpy:
-        renpy.invoke_in_main_thread(asyncio.create_task, serve_websocket(port=port))
+        renpy.invoke_in_main_thread(asyncio.run, serve_websocket(port=port))
     else:
         asyncio.run(serve_websocket(port=port))
