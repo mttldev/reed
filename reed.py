@@ -1,55 +1,54 @@
+# Python 3.9.10 embedded in Ren'Py
+
 try:
     renpy = __import__("renpy").exports
 except ImportError:
     renpy = None
 
-import ast
 import asyncio
+import enum
 
+from typing import Final
 from websockets.exceptions import ConnectionClosedError
 from websockets.server import serve, WebSocketServerProtocol
 
-class ExecutedResult:
-    _failed: bool | None = None
-    _exception: Exception | None = None
 
-    def __init__(self, command: str) -> None:
-        self.command = command
+ExecResult: Final[int] = 0
+ExecEnv: Final[int] = 1
+ExecMode: Final[int] = 2
 
-    @property
-    def failed(self) -> bool:
-        if self._failed is None:
-            raise AttributeError("ExecutedResult object has not been executed yet.")
-        return self._failed
 
-    @failed.setter
-    def failed(self, value: bool | None) -> None:
-        raise AttributeError("Cannot set failed property of ExecutedResult object. Use failed() method instead.")
+class ExecuteEnvironment(enum.Enum):
+    RENPY = 1
+    PYTHON = 2
 
-    @property
-    def exception(self) -> Exception:
-        if self._exception is None:
-            raise AttributeError("ExecutedResult object has not been executed yet.")
-        return self._exception
-
-    @exception.setter
-    def exception(self, value: Exception | None) -> None:
-        raise AttributeError("Cannot set exception property of ExecutedResult object. Use exception() method instead.")
-
-    def execute(self) -> None:
-        try:
-            tree = ast.parse(self.command)
-            exec(compile(tree, filename="<string>", mode="exec"), globals(), locals())
-            self._failed = False
-        except Exception as e:
-            self._exception = e
-            self._failed = True
+class ExecuteMode(enum.Enum):
+    EVAL = 1
+    EXEC = 2
 
 def notify(message: str):
     if renpy:
         renpy.notify(message)
     else:
         print(message)
+
+def execute(command: str):
+    if renpy:
+        # Execute in Ren'Py
+        try:
+            # Return the result of the expression.
+            return [renpy.python.py_eval(command), ExecuteEnvironment.RENPY, ExecuteMode.EVAL]
+        except SyntaxError:
+            # Return None
+            return [renpy.python.py_exec(command), ExecuteEnvironment.RENPY, ExecuteMode.EXEC]
+    else:
+        # Execute in Python
+        try:
+            # Return the result of the expression.
+            return [eval(command), ExecuteEnvironment.PYTHON, ExecuteMode.EVAL]
+        except SyntaxError:
+            # Return None
+            return [exec(command), ExecuteEnvironment.PYTHON, ExecuteMode.EXEC]
 
 async def callback_websocket(websocket: WebSocketServerProtocol):
     notify(f"[reed] New connection from {websocket.remote_address[0]}")
@@ -58,13 +57,11 @@ async def callback_websocket(websocket: WebSocketServerProtocol):
             print(f"<<< {message}")
             # execute
             try:
-                command = str(message)
-                result = ExecutedResult(command)
-                result.execute()
-                if result.failed:
-                    await websocket.send(f"ERR>>> {result.exception}")
-                else:
-                    await websocket.send("OK>>>")
+                result = execute(str(message))
+                if result[ExecMode] == ExecuteMode.EVAL:
+                    await websocket.send(f"OK[{'RENPY' if result[ExecEnv] == ExecuteEnvironment.RENPY else 'PYTHON'}]>>> {result[ExecResult]}")
+                elif result[ExecMode] == ExecuteMode.EXEC:
+                    await websocket.send(f"OK[{'RENPY' if result[ExecEnv] == ExecuteEnvironment.RENPY else 'PYTHON'}].")
             except Exception as e:
                 print(f"Error: {e}")
                 await websocket.send(f"ERR>>> {e}")
@@ -77,6 +74,6 @@ async def serve_websocket(port: int = 35124):
 
 def run(port: int):
     if renpy:
-        renpy.invoke_in_main_thread(asyncio.create_task, serve_websocket(port=port))
+        renpy.invoke_in_thread(asyncio.run, serve_websocket(port=port))
     else:
         asyncio.run(serve_websocket(port=port))
