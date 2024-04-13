@@ -6,13 +6,12 @@ except ImportError:
 import ast
 import asyncio
 
-import typing
 from websockets.exceptions import ConnectionClosedError
 from websockets.server import serve, WebSocketServerProtocol
 
 class ExecutedResult:
-    _failed: typing.Optional[bool] = None
-    _exception: typing.Optional[Exception] = None
+    _failed: bool | None = None
+    _exception: Exception | None = None
 
     def __init__(self, command: str) -> None:
         self.command = command
@@ -24,7 +23,7 @@ class ExecutedResult:
         return self._failed
 
     @failed.setter
-    def failed(self, value: typing.Optional[bool]) -> None:
+    def failed(self, value: bool | None) -> None:
         raise AttributeError("Cannot set failed property of ExecutedResult object. Use failed() method instead.")
 
     @property
@@ -34,7 +33,7 @@ class ExecutedResult:
         return self._exception
 
     @exception.setter
-    def exception(self, value: typing.Optional[Exception]) -> None:
+    def exception(self, value: Exception | None) -> None:
         raise AttributeError("Cannot set exception property of ExecutedResult object. Use exception() method instead.")
 
     def execute(self) -> None:
