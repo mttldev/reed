@@ -5,26 +5,16 @@ try:
 except ImportError:
     renpy = None
 
+import ast
 import asyncio
-import enum
 
-from typing import Final
+from typing import Final, TypedDict, Optional
 from websockets.exceptions import ConnectionClosedError
 from websockets.server import serve, WebSocketServerProtocol
 
-
-ExecResult: Final[int] = 0
-ExecEnv: Final[int] = 1
-ExecMode: Final[int] = 2
-
-
-class ExecuteEnvironment(enum.Enum):
-    RENPY = 1
-    PYTHON = 2
-
-class ExecuteMode(enum.Enum):
-    EVAL = 1
-    EXEC = 2
+class ExecutedResult(TypedDict):
+    result: bool
+    exception: Optional[Exception]
 
 def notify(message: str):
     if renpy:
@@ -32,23 +22,34 @@ def notify(message: str):
     else:
         print(message)
 
-def execute(command: str):
+def execute(command: str) -> ExecutedResult:
+    tree = ast.parse(command)
     if renpy:
-        # Execute in Ren'Py
         try:
-            # Return the result of the expression.
-            return [renpy.python.py_eval(command), ExecuteEnvironment.RENPY, ExecuteMode.EVAL]
-        except SyntaxError:
+            renpy.invoke_in_main_thread(renpy.python.py_exec, compile(tree, filename="<string>", mode="exec"), globals(), locals())
+            return {
+                "result": True,
+                "exception": None
+            }
+        except Exception as err:
             # Return None
-            return [renpy.python.py_exec(command), ExecuteEnvironment.RENPY, ExecuteMode.EXEC]
+            return {
+                "result": False,
+                "exception": err
+            }
     else:
-        # Execute in Python
         try:
-            # Return the result of the expression.
-            return [eval(command), ExecuteEnvironment.PYTHON, ExecuteMode.EVAL]
-        except SyntaxError:
+            exec(compile(tree, filename="<string>", mode="exec"), globals(), locals())
+            return {
+                "result": True,
+                "exception": None
+            }
+        except Exception as err:
             # Return None
-            return [exec(command), ExecuteEnvironment.PYTHON, ExecuteMode.EXEC]
+            return {
+                "result": False,
+                "exception": err
+            }
 
 async def callback_websocket(websocket: WebSocketServerProtocol):
     notify(f"[reed] New connection from {websocket.remote_address[0]}")
@@ -58,10 +59,10 @@ async def callback_websocket(websocket: WebSocketServerProtocol):
             # execute
             try:
                 result = execute(str(message))
-                if result[ExecMode] == ExecuteMode.EVAL:
-                    await websocket.send(f"OK[{'RENPY' if result[ExecEnv] == ExecuteEnvironment.RENPY else 'PYTHON'}]>>> {result[ExecResult]}")
-                elif result[ExecMode] == ExecuteMode.EXEC:
-                    await websocket.send(f"OK[{'RENPY' if result[ExecEnv] == ExecuteEnvironment.RENPY else 'PYTHON'}].")
+                if result["result"]:
+                    await websocket.send("OK")
+                else:
+                    await websocket.send(f"ERR>>> {result['exception']}")
             except Exception as e:
                 print(f"Error: {e}")
                 await websocket.send(f"ERR>>> {e}")
